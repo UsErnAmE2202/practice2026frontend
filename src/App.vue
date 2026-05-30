@@ -257,7 +257,7 @@ export default {
     const selectedElementId = ref(null)
     const showGrid = ref(false)
     const snapToGrid = ref(true)
-    const zoom = ref(0.8)
+    const zoom = ref(1.25) // Изменено с 0.8 на 1.25 (125%)
     const templates = ref([])
     const templateName = ref('')
     const importXml = ref('')
