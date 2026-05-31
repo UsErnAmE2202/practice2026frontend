@@ -64,7 +64,7 @@
     <div class="main-editor">
       <div class="layers-panel">
         <div class="panel-header">
-          <h3>📑 Слои</h3>
+          <h3><span>📑</span> <span>Слои</span></h3>
           <span class="layer-count">{{ elements.length }}</span>
         </div>
         
@@ -200,7 +200,7 @@
 
       <div class="templates-panel">
         <div class="panel-header">
-          <h3>📚 Шаблоны</h3>
+          <h3><span>📚</span> <span>Шаблоны</span></h3>
         </div>
         
         <div class="save-template-section">
@@ -1620,6 +1620,19 @@ export default {
 .panel-header h3 {
   font-size: 18px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Убираем градиент с эмодзи, оставляя его только для текста */
+.panel-header h3 span:first-child {
+  background: none;
+  -webkit-text-fill-color: initial;
+  color: #333; /* Цвет для эмодзи */
+}
+
+.panel-header h3 span:last-child {
   background: linear-gradient(135deg, #667eea, #764ba2);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
