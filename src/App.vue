@@ -1,89 +1,177 @@
 <template>
   <div id="app">
     <div class="toolbar">
-      <div class="toolbar-group">
-        <button @click="exportAs('png')" class="btn btn-png">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="2" width="20" height="20" rx="2.5" />
-            <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-          PNG
-        </button>
-        <button @click="exportAs('jpeg')" class="btn btn-jpeg">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="2" width="20" height="20" rx="2.5" />
-            <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5" />
-            <rect x="8" y="8" width="8" height="8" rx="1" />
-          </svg>
-          JPEG
-        </button>
-        <button @click="exportAs('pdf')" class="btn btn-pdf">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 4h16v16H4V4z" />
-            <path d="M8 8h8M8 12h6M8 16h4" />
-            <path d="M16 20l2-2-2-2" />
-          </svg>
-          PDF
-        </button>
-        <button @click="exportAs('svg')" class="btn btn-svg">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-          </svg>
-          SVG
-        </button>
+      <div class="toolbar-left">
+        <div class="toolbar-group">
+          <button @click="exportAs('png')" class="btn btn-png">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="2" width="20" height="20" rx="2.5" />
+              <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            PNG
+          </button>
+          <button @click="exportAs('jpeg')" class="btn btn-jpeg">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="2" width="20" height="20" rx="2.5" />
+              <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5" />
+              <rect x="8" y="8" width="8" height="8" rx="1" />
+            </svg>
+            JPEG
+          </button>
+          <button @click="exportAs('pdf')" class="btn btn-pdf">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16v16H4V4z" />
+              <path d="M8 8h8M8 12h6M8 16h4" />
+              <path d="M16 20l2-2-2-2" />
+            </svg>
+            PDF
+          </button>
+          <button @click="exportAs('svg')" class="btn btn-svg">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-2zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+            SVG
+          </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <div class="toolbar-group">
+          <select v-model="selectedStandardSize" @change="applyStandardSize" class="select-modern">
+            <option value="A4 Portrait">A4 Portrait</option>
+            <option value="A4 Landscape">A4 Landscape</option>
+            <option value="A5 Portrait">A5 Portrait</option>
+            <option value="A5 Landscape">A5 Landscape</option>
+            <option value="Letter Portrait">Letter Portrait</option>
+            <option value="Letter Landscape">Letter Landscape</option>
+            <option value="Custom">Custom</option>
+          </select>
+          
+          <div class="size-input-group">
+            <input type="number" v-model.number="customWidth" @input="updateCustomSize" placeholder="Ширина" class="size-input-modern" />
+            <span class="size-separator">×</span>
+            <input type="number" v-model.number="customHeight" @input="updateCustomSize" placeholder="Высота" class="size-input-modern" />
+          </div>
+          
+          <div class="control-group">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="showGrid" />
+              <svg class="checkbox-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
+              </svg>
+              <span>Сетка</span>
+            </label>
+            
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="snapToGrid" />
+              <svg class="checkbox-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <span>Привязка</span>
+            </label>
+          </div>
+          
+          <select v-model="zoom" class="select-modern">
+            <option :value="0.5">50%</option>
+            <option :value="0.6">60%</option>
+            <option :value="0.7">70%</option>
+            <option :value="0.8">80%</option>
+            <option :value="0.9">90%</option>
+            <option :value="1">100%</option>
+            <option :value="1.25">125%</option>
+            <option :value="1.5">150%</option>
+            <option :value="2">200%</option>
+          </select>
+        </div>
       </div>
 
-      <div class="toolbar-divider"></div>
+      <!-- Кнопки входа и регистрации в правом верхнем углу -->
+      <div class="auth-buttons" v-if="!currentUser">
+        <button @click="openLoginModal" class="btn-login">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M13.8 12H3"/>
+          </svg>
+          Вход
+        </button>
+        <button @click="openRegisterModal" class="btn-register">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="8.5" cy="7" r="4"/>
+            <line x1="20" y1="8" x2="20" y2="14"/>
+            <line x1="17" y1="11" x2="23" y2="11"/>
+          </svg>
+          Регистрация
+        </button>
+      </div>
+      <div class="user-info" v-else>
+        <svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span class="username">{{ currentUser.username }}</span>
+        <button @click="logout" class="btn-logout">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+          </svg>
+          Выйти
+        </button>
+      </div>
+    </div>
 
-      <div class="toolbar-group">
-        <select v-model="selectedStandardSize" @change="applyStandardSize" class="select-modern">
-          <option value="A4 Portrait">A4 Portrait</option>
-          <option value="A4 Landscape">A4 Landscape</option>
-          <option value="A5 Portrait">A5 Portrait</option>
-          <option value="A5 Landscape">A5 Landscape</option>
-          <option value="Letter Portrait">Letter Portrait</option>
-          <option value="Letter Landscape">Letter Landscape</option>
-          <option value="Custom">Custom</option>
-        </select>
-        
-        <div class="size-input-group">
-          <input type="number" v-model.number="customWidth" @input="updateCustomSize" placeholder="Ширина" class="size-input-modern" />
-          <span class="size-separator">×</span>
-          <input type="number" v-model.number="customHeight" @input="updateCustomSize" placeholder="Высота" class="size-input-modern" />
+    <!-- Модальное окно входа -->
+    <div v-if="showLoginModal" class="modal-overlay" @click.self="closeModals">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Вход в аккаунт</h3>
+          <button @click="closeModals" class="modal-close">&times;</button>
         </div>
-        
-        <div class="control-group">
-          <label class="checkbox-label">
-            <input type="checkbox" v-model="showGrid" />
-            <svg class="checkbox-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
-            </svg>
-            <span>Сетка</span>
-          </label>
-          
-          <label class="checkbox-label">
-            <input type="checkbox" v-model="snapToGrid" />
-            <svg class="checkbox-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-            <span>Привязка</span>
-          </label>
+        <div class="modal-body">
+          <div class="input-group">
+            <label>Имя пользователя</label>
+            <input type="text" v-model="loginForm.username" placeholder="Введите имя" class="input-modern" />
+          </div>
+          <div class="input-group">
+            <label>Пароль</label>
+            <input type="password" v-model="loginForm.password" placeholder="Введите пароль" class="input-modern" @keyup.enter="login" />
+          </div>
+          <div v-if="loginError" class="error-message">{{ loginError }}</div>
+          <button @click="login" class="btn btn-primary btn-block">Войти</button>
         </div>
-        
-        <select v-model="zoom" class="select-modern">
-          <option :value="0.5">50%</option>
-          <option :value="0.6">60%</option>
-          <option :value="0.7">70%</option>
-          <option :value="0.8">80%</option>
-          <option :value="0.9">90%</option>
-          <option :value="1">100%</option>
-          <option :value="1.25">125%</option>
-          <option :value="1.5">150%</option>
-          <option :value="2">200%</option>
-        </select>
+        <div class="modal-footer">
+          <span>Нет аккаунта? <a href="#" @click.prevent="switchToRegister">Зарегистрироваться</a></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно регистрации -->
+    <div v-if="showRegisterModal" class="modal-overlay" @click.self="closeModals">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Регистрация</h3>
+          <button @click="closeModals" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="input-group">
+            <label>Имя пользователя</label>
+            <input type="text" v-model="registerForm.username" placeholder="Придумайте имя" class="input-modern" />
+          </div>
+          <div class="input-group">
+            <label>Пароль</label>
+            <input type="password" v-model="registerForm.password" placeholder="Придумайте пароль" class="input-modern" />
+          </div>
+          <div class="input-group">
+            <label>Подтверждение пароля</label>
+            <input type="password" v-model="registerForm.confirmPassword" placeholder="Повторите пароль" class="input-modern" @keyup.enter="register" />
+          </div>
+          <div v-if="registerError" class="error-message">{{ registerError }}</div>
+          <button @click="register" class="btn btn-primary btn-block">Зарегистрироваться</button>
+        </div>
+        <div class="modal-footer">
+          <span>Уже есть аккаунт? <a href="#" @click.prevent="switchToLogin">Войти</a></span>
+        </div>
       </div>
     </div>
 
@@ -199,8 +287,7 @@
               <path d="M4 4h16v16H4V4z"/>
               <path d="M8 8h8M8 12h6M8 16h4"/>
             </svg>
-            <span>Нет элементов</span>
-            <small>Добавьте текст или изображение</small>
+            <span>Нет элементов. Добавьте текст или изображение</span>
           </div>
         </div>
         
@@ -430,6 +517,15 @@ export default {
     
     const gridSize = 20
     
+    // Auth state
+    const currentUser = ref(null)
+    const showLoginModal = ref(false)
+    const showRegisterModal = ref(false)
+    const loginForm = ref({ username: '', password: '' })
+    const registerForm = ref({ username: '', password: '', confirmPassword: '' })
+    const loginError = ref('')
+    const registerError = ref('')
+    
     const sortedElements = computed(() => {
       return [...elements.value].reverse()
     })
@@ -476,6 +572,95 @@ export default {
     })
     
     const generateId = () => `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    // Auth methods
+    const openLoginModal = () => {
+      loginForm.value = { username: '', password: '' }
+      loginError.value = ''
+      showLoginModal.value = true
+    }
+    
+    const openRegisterModal = () => {
+      registerForm.value = { username: '', password: '', confirmPassword: '' }
+      registerError.value = ''
+      showRegisterModal.value = true
+    }
+    
+    const closeModals = () => {
+      showLoginModal.value = false
+      showRegisterModal.value = false
+      loginError.value = ''
+      registerError.value = ''
+    }
+    
+    const switchToRegister = () => {
+      closeModals()
+      openRegisterModal()
+    }
+    
+    const switchToLogin = () => {
+      closeModals()
+      openLoginModal()
+    }
+    
+    const login = () => {
+      if (!loginForm.value.username || !loginForm.value.password) {
+        loginError.value = 'Заполните все поля'
+        return
+      }
+      
+      const users = JSON.parse(localStorage.getItem('flyer_users') || '[]')
+      const user = users.find(u => u.username === loginForm.value.username && u.password === loginForm.value.password)
+      
+      if (user) {
+        currentUser.value = { username: user.username }
+        localStorage.setItem('flyer_current_user', JSON.stringify(currentUser.value))
+        closeModals()
+        loginError.value = ''
+      } else {
+        loginError.value = 'Неверное имя пользователя или пароль'
+      }
+    }
+    
+    const register = () => {
+      if (!registerForm.value.username || !registerForm.value.password) {
+        registerError.value = 'Заполните все поля'
+        return
+      }
+      
+      if (registerForm.value.password !== registerForm.value.confirmPassword) {
+        registerError.value = 'Пароли не совпадают'
+        return
+      }
+      
+      if (registerForm.value.password.length < 3) {
+        registerError.value = 'Пароль должен быть не менее 3 символов'
+        return
+      }
+      
+      const users = JSON.parse(localStorage.getItem('flyer_users') || '[]')
+      
+      if (users.find(u => u.username === registerForm.value.username)) {
+        registerError.value = 'Пользователь с таким именем уже существует'
+        return
+      }
+      
+      users.push({
+        username: registerForm.value.username,
+        password: registerForm.value.password
+      })
+      
+      localStorage.setItem('flyer_users', JSON.stringify(users))
+      currentUser.value = { username: registerForm.value.username }
+      localStorage.setItem('flyer_current_user', JSON.stringify(currentUser.value))
+      closeModals()
+      registerError.value = ''
+    }
+    
+    const logout = () => {
+      currentUser.value = null
+      localStorage.removeItem('flyer_current_user')
+    }
     
     const startDragLayer = (event, index) => {
       dragLayerIndex.value = index
@@ -1297,6 +1482,13 @@ export default {
       ]
       
       templates.value = [...presetTemplates, ...userTemplates]
+      
+      // Check for existing session
+      const savedUser = localStorage.getItem('flyer_current_user')
+      if (savedUser) {
+        currentUser.value = JSON.parse(savedUser)
+      }
+      
       drawCanvas()
     })
     
@@ -1354,7 +1546,23 @@ export default {
       deleteTemplate,
       moveLayerUp,
       moveLayerDown,
-      startDragLayer
+      startDragLayer,
+      // Auth
+      currentUser,
+      showLoginModal,
+      showRegisterModal,
+      loginForm,
+      registerForm,
+      loginError,
+      registerError,
+      openLoginModal,
+      openRegisterModal,
+      closeModals,
+      switchToRegister,
+      switchToLogin,
+      login,
+      register,
+      logout
     }
   }
 }
@@ -1381,10 +1589,17 @@ export default {
   padding: 12px 24px;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
-  gap: 16px;
   flex-wrap: wrap;
   flex-shrink: 0;
   align-items: center;
+  justify-content: space-between;
+}
+
+.toolbar-left {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .toolbar-divider {
@@ -1398,6 +1613,200 @@ export default {
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+/* Auth buttons */
+.auth-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn-login, .btn-register, .btn-logout {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-login {
+  background: #e2e8f0;
+  color: #334155;
+}
+.btn-login:hover {
+  background: #cbd5e1;
+}
+
+.btn-register {
+  background: #3b82f6;
+  color: white;
+}
+.btn-register:hover {
+  background: #2563eb;
+}
+
+.btn-logout {
+  background: #f1f5f9;
+  color: #ef4444;
+  border: 1px solid #fee2e2;
+}
+.btn-logout:hover {
+  background: #fee2e2;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  padding: 4px 12px 4px 8px;
+  border-radius: 30px;
+  border: 1px solid #e2e8f0;
+}
+
+.user-icon {
+  width: 28px;
+  height: 28px;
+  color: #3b82f6;
+}
+
+.username {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 16px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 20px 35px -8px rgba(0, 0, 0, 0.3);
+  animation: modalFadeIn 0.2s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-header {
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #94a3b8;
+  line-height: 1;
+  padding: 0 4px;
+}
+.modal-close:hover {
+  color: #475569;
+}
+
+.modal-body {
+  padding: 20px 24px;
+}
+
+.modal-body .input-group {
+  margin-bottom: 16px;
+}
+
+.modal-body .input-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.modal-body .input-modern {
+  width: 100%;
+}
+
+.modal-footer {
+  padding: 12px 24px 20px;
+  border-top: 1px solid #e2e8f0;
+  text-align: center;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.modal-footer a {
+  color: #3b82f6;
+  text-decoration: none;
+  cursor: pointer;
+}
+.modal-footer a:hover {
+  text-decoration: underline;
+}
+
+.error-message {
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-primary:hover {
+  background: #2563eb;
+}
+
+.btn-block {
+  width: 100%;
+  justify-content: center;
 }
 
 .btn {
@@ -1463,7 +1872,6 @@ export default {
 .btn-danger { background: #dc2626; color: white; }
 .btn-danger:hover { background: #b91c1c; }
 
-.btn-block { width: 100%; justify-content: center; }
 .btn-small { padding: 6px 12px; font-size: 12px; border-radius: 4px; }
 
 .select-modern, .input-modern, .textarea-modern {
