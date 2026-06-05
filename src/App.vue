@@ -479,12 +479,15 @@
 </template>
 
 <script>
+import { projectsAPI, templatesAPI, authAPI } from './api/client'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import jsPDF from 'jspdf'
 
 export default {
   name: 'App',
   setup() {
+    const isLoading = ref(false)
+    const serverTemplates = ref([])
     const canvasRef = ref(null)
     const imageInput = ref(null)
     const bgImageInput = ref(null)
@@ -527,7 +530,9 @@ export default {
     const registerError = ref('')
     
     const sortedElements = computed(() => {
-      return [...elements.value].reverse()
+      return [...elements.value].reverse(),
+      isLoading,
+      loadTemplatesFromServer
     })
     
     const popularFonts = [
@@ -603,64 +608,131 @@ export default {
       openLoginModal()
     }
     
-    const login = () => {
-      if (!loginForm.value.username || !loginForm.value.password) {
-        loginError.value = 'Заполните все поля'
-        return
-      }
-      
-      const users = JSON.parse(localStorage.getItem('flyer_users') || '[]')
-      const user = users.find(u => u.username === loginForm.value.username && u.password === loginForm.value.password)
-      
-      if (user) {
-        currentUser.value = { username: user.username }
-        localStorage.setItem('flyer_current_user', JSON.stringify(currentUser.value))
-        closeModals()
-        loginError.value = ''
-      } else {
-        loginError.value = 'Неверное имя пользователя или пароль'
-      }
-    }
+const loadTemplatesFromServer = async () => {
+  try {
+    isLoading.value = true
+    const response = await templatesAPI.getAll()
+    // Бэкенд возвращает массив шаблонов
+    const serverTemplates = response.data.items || response.data
     
-    const register = () => {
-      if (!registerForm.value.username || !registerForm.value.password) {
-        registerError.value = 'Заполните все поля'
-        return
-      }
+    // Преобразуем в формат фронтенда
+    const formattedTemplates = serverTemplates.map(t => ({
+      id: t.id,
+      name: t.name,
+      xml: t.xml_content,
+      isPreset: t.user_id === null || t.user_id === undefined,
+    }))
+    
+    // Сохраняем предустановленные шаблоны (те, что были в localStorage)
+    // и добавляем серверные
+    templates.value = formattedTemplates
+  } catch (error) {
+    console.error('Failed to load templates:', error)
+    // Если сервер недоступен, используем локальные пресеты
+    const savedTemplates = localStorage.getItem('flyer_templates')
+    const userTemplates = savedTemplates ? JSON.parse(savedTemplates) : []
+    const presetTemplates = getPresetTemplates() // вынесите пресеты в отдельную функцию
+    templates.value = [...presetTemplates, ...userTemplates]
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const saveProjectToServer = async () => {
+  try {
+    isLoading.value = true
+    const xmlContent = generateCurrentXML()
+    const response = await projectsAPI.create('Новый проект', xmlContent)
+    alert(`Проект сохранён! ID: ${response.data.id}`)
+  } catch (error) {
+    console.error('Ошибка сохранения:', error)
+    alert('Ошибка сохранения проекта')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+    const login = async () => {
+  if (!loginForm.value.username || !loginForm.value.password) {
+    loginError.value = 'Заполните все поля'
+    return
+  }
+  
+  try {
+    isLoading.value = true
+    const response = await authAPI.login(loginForm.value.username, loginForm.value.password)
+    
+    console.log('Login response:', response.data)
+    
+    if (response.data && response.data.access_token) {
+      localStorage.setItem('access_token', response.data.access_token)
+      currentUser.value = { username: loginForm.value.username }
       
-      if (registerForm.value.password !== registerForm.value.confirmPassword) {
-        registerError.value = 'Пароли не совпадают'
-        return
-      }
-      
-      if (registerForm.value.password.length < 3) {
-        registerError.value = 'Пароль должен быть не менее 3 символов'
-        return
-      }
-      
-      const users = JSON.parse(localStorage.getItem('flyer_users') || '[]')
-      
-      if (users.find(u => u.username === registerForm.value.username)) {
-        registerError.value = 'Пользователь с таким именем уже существует'
-        return
-      }
-      
-      users.push({
-        username: registerForm.value.username,
-        password: registerForm.value.password
-      })
-      
-      localStorage.setItem('flyer_users', JSON.stringify(users))
-      currentUser.value = { username: registerForm.value.username }
-      localStorage.setItem('flyer_current_user', JSON.stringify(currentUser.value))
       closeModals()
-      registerError.value = ''
+      loginError.value = ''
+      
+      // ВАЖНО: перезагружаем шаблоны с токеном
+      await loadTemplatesFromServer()
+    } else {
+      loginError.value = 'Неверный ответ сервера'
     }
+  } catch (error) {
+    console.error('Login error:', error)
+    loginError.value = 'Неверное имя пользователя или пароль'
+  } finally {
+    isLoading.value = false
+  }
+}
     
-    const logout = () => {
-      currentUser.value = null
-      localStorage.removeItem('flyer_current_user')
+    const register = async () => {
+  if (!registerForm.value.username || !registerForm.value.password) {
+    registerError.value = 'Заполните все поля'
+    return
+  }
+  
+  if (registerForm.value.password !== registerForm.value.confirmPassword) {
+    registerError.value = 'Пароли не совпадают'
+    return
+  }
+  
+  if (registerForm.value.password.length < 3) {
+    registerError.value = 'Пароль должен быть не менее 3 символов'
+    return
+  }
+  
+  try {
+    isLoading.value = true
+    // Регистрируем пользователя
+    await authAPI.register(registerForm.value.username, registerForm.value.password)
+    
+    // После успешной регистрации автоматически входим
+    const loginResponse = await authAPI.login(registerForm.value.username, registerForm.value.password)
+    localStorage.setItem('access_token', loginResponse.data.access_token)
+    currentUser.value = { username: registerForm.value.username }
+    
+    closeModals()
+    registerError.value = ''
+    
+    // После регистрации обновляем список шаблонов
+    await loadTemplatesFromServer()
+  } catch (error) {
+    console.error('Registration error:', error)
+    if (error.response && error.response.status === 400) {
+      registerError.value = error.response.data.detail || 'Пользователь с таким именем уже существует'
+    } else {
+      registerError.value = 'Ошибка сервера. Попробуйте позже.'
     }
+  } finally {
+    isLoading.value = false
+  }
+}
+
+    const logout = () => {
+  currentUser.value = null
+  localStorage.removeItem('access_token')
+  // Не очищаем редактор, но обновляем шаблоны (показываем только пресеты)
+  loadTemplatesFromServer()
+}
     
     const startDragLayer = (event, index) => {
       dragLayerIndex.value = index
@@ -1281,41 +1353,59 @@ export default {
       return svgContent
     }
     
-    const saveTemplate = () => {
-      if (!templateName.value) {
-        alert('Введите название шаблона')
-        return
-      }
-      
-      let xml = `<?xml version="1.0" encoding="UTF-8"?>
-<flyer width="${canvasSize.value.width}" height="${canvasSize.value.height}" background="${backgroundColor.value}" bgImage="${backgroundImage.value ? escapeXml(backgroundImage.value.src) : ''}" bgOpacity="${bgOpacity.value}">`
-      
-      elements.value.forEach(el => {
-        if (el.type === 'text') {
-          xml += `
+const generateCurrentXML = () => {
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<flyer width="${canvasSize.value.width}" height="${canvasSize.value.height}" 
+       background="${backgroundColor.value}" bgImage="${backgroundImage.value ? escapeXml(backgroundImage.value.src) : ''}" 
+       bgOpacity="${bgOpacity.value}">`
+  
+  elements.value.forEach(el => {
+    if (el.type === 'text') {
+      xml += `
   <element type="text" id="${el.id}" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" 
            content="${escapeXml(el.content)}" font-family="${el.fontFamily}" font-size="${el.fontSize}" 
            font-weight="${el.fontWeight}" font-style="${el.fontStyle || 'normal'}" color="${el.color}" align="${el.align}"/>`
-        } else if (el.type === 'image') {
-          xml += `
-  <element type="image" id="${el.id}" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" src="${escapeXml(el.src)}"/>`
-        }
-      })
-      
-      xml += `\n</flyer>`
-      
-      const newTemplate = {
-        id: generateId(),
-        name: templateName.value,
-        xml: xml,
-        isPreset: false
-      }
-      
-      templates.value.push(newTemplate)
-      localStorage.setItem('flyer_templates', JSON.stringify(templates.value.filter(t => !t.isPreset)))
-      templateName.value = ''
-      alert('Шаблон сохранен!')
+    } else if (el.type === 'image') {
+      xml += `
+  <element type="image" id="${el.id}" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" 
+           src="${escapeXml(el.src)}"/>`
     }
+  })
+  
+  xml += `\n</flyer>`
+  return xml
+}
+
+    const saveTemplate = async () => {
+  if (!templateName.value) {
+    alert('Введите название шаблона')
+    return
+  }
+  
+  try {
+    isLoading.value = true
+    const xmlContent = generateCurrentXML()
+    
+    // Отправляем на сервер
+    const response = await templatesAPI.create(templateName.value, xmlContent)
+    console.log('Template saved to server:', response.data)
+    
+    // Обновляем список шаблонов с сервера
+    await loadTemplatesFromServer()
+    
+    templateName.value = ''
+    alert('Шаблон сохранён на сервере!')
+  } catch (error) {
+    console.error('Failed to save template:', error)
+    if (error.response && error.response.status === 401) {
+      alert('Необходимо авторизоваться для сохранения шаблона')
+    } else {
+      alert('Ошибка сохранения шаблона')
+    }
+  } finally {
+    isLoading.value = false
+  }
+}
     
     const loadTemplate = async (xmlString) => {
       const parser = new DOMParser()
@@ -1412,13 +1502,37 @@ export default {
       }
     }
     
-    const deleteTemplate = (id) => {
-      const template = templates.value.find(t => t.id === id)
-      if (template && !template.isPreset) {
-        templates.value = templates.value.filter(t => t.id !== id)
-        localStorage.setItem('flyer_templates', JSON.stringify(templates.value.filter(t => !t.isPreset)))
-      }
+    const deleteTemplate = async (id) => {
+  // Проверяем, что это не предустановленный шаблон
+  const template = templates.value.find(t => t.id === id)
+  if (!template || template.isPreset) {
+    alert('Нельзя удалить предустановленный шаблон')
+    return
+  }
+  
+  if (!confirm('Удалить шаблон?')) return
+  
+  try {
+    isLoading.value = true
+    await templatesAPI.delete(id)
+    console.log('Template deleted from server:', id)
+    
+    // Обновляем список шаблонов
+    await loadTemplatesFromServer()
+    alert('Шаблон удалён')
+  } catch (error) {
+    console.error('Failed to delete template:', error)
+    if (error.response && error.response.status === 401) {
+      alert('Необходимо авторизоваться для удаления шаблона')
+    } else if (error.response && error.response.status === 403) {
+      alert('Вы не можете удалить этот шаблон')
+    } else {
+      alert('Ошибка удаления шаблона')
     }
+  } finally {
+    isLoading.value = false
+  }
+}
     
     const escapeXml = (str) => {
       if (!str) return ''
@@ -1430,67 +1544,21 @@ export default {
         .replace(/'/g, '&apos;')
     }
     
-    onMounted(() => {
-      const savedTemplates = localStorage.getItem('flyer_templates')
-      const userTemplates = savedTemplates ? JSON.parse(savedTemplates) : []
-      
-      const presetTemplates = [
-        {
-          id: 'preset1',
-          name: 'Рекламная листовка',
-          isPreset: true,
-          xml: `<?xml version="1.0" encoding="UTF-8"?>
-<flyer width="600" height="850" background="#f8f9fa" bgImage="" bgOpacity="100">
-  <element type="text" id="t1" x="100" y="100" width="400" height="80" 
-           content="СУПЕР АКЦИЯ!" font-family="Arial, sans-serif" font-size="48" 
-           font-weight="bold" font-style="normal" color="#dc3545" align="center"/>
-  <element type="text" id="t2" x="100" y="200" width="400" height="60" 
-           content="Скидки до 50%" font-family="Arial, sans-serif" font-size="32" 
-           font-weight="normal" font-style="italic" color="#495057" align="center"/>
-</flyer>`
-        },
-        {
-          id: 'preset2',
-          name: 'Приглашение',
-          isPreset: true,
-          xml: `<?xml version="1.0" encoding="UTF-8"?>
-<flyer width="600" height="850" background="#fff5f0" bgImage="" bgOpacity="100">
-  <element type="text" id="t1" x="100" y="80" width="400" height="60" 
-           content="ВЫ ПРИГЛАШЕНЫ" font-family="Georgia, serif" font-size="36" 
-           font-weight="bold" font-style="normal" color="#e67e22" align="center"/>
-  <element type="text" id="t2" x="100" y="160" width="400" height="200" 
-           content="На вечеринку по случаю Нового года\n22 декабря в 19:00" 
-           font-family="Georgia, serif" font-size="24" font-weight="normal" 
-           font-style="italic" color="#7f8c8d" align="center"/>
-</flyer>`
-        },
-        {
-          id: 'preset3',
-          name: 'Объявление',
-          isPreset: true,
-          xml: `<?xml version="1.0" encoding="UTF-8"?>
-<flyer width="600" height="850" background="#e8f4f8" bgImage="" bgOpacity="100">
-  <element type="text" id="t1" x="50" y="50" width="500" height="50" 
-           content="ОБЪЯВЛЕНИЕ" font-family="Arial, sans-serif" font-size="32" 
-           font-weight="bold" font-style="normal" color="#2980b9" align="center"/>
-  <element type="text" id="t2" x="50" y="120" width="500" height="400" 
-           content="Пропала собака\nПорода: такса\nОкрас: рыжий\nКличка: Барон\n\nТел.: 8-999-123-45-67" 
-           font-family="Arial, sans-serif" font-size="20" font-weight="normal" 
-           font-style="normal" color="#2c3e50" align="left"/>
-</flyer>`
-        }
-      ]
-      
-      templates.value = [...presetTemplates, ...userTemplates]
-      
-      // Check for existing session
-      const savedUser = localStorage.getItem('flyer_current_user')
-      if (savedUser) {
-        currentUser.value = JSON.parse(savedUser)
-      }
-      
-      drawCanvas()
-    })
+   onMounted(() => {
+  // Загружаем шаблоны с сервера
+  loadTemplatesFromServer()
+  
+  // Проверяем сохранённую сессию
+  const token = localStorage.getItem('access_token')
+  if (token) {
+    const savedUser = localStorage.getItem('flyer_username')
+    if (savedUser) {
+      currentUser.value = { username: savedUser }
+  }
+  }
+  
+  drawCanvas()
+})
     
     watch([canvasSize, backgroundColor, backgroundImage, bgOpacity, elements, selectedElementId, showGrid], () => {
       nextTick(() => drawCanvas())
