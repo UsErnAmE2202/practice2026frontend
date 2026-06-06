@@ -33,6 +33,23 @@
             </svg>
             SVG
           </button>
+          <button @click="saveProjectToServer" class="btn btn-save" v-if="currentUser">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            Сохранить проект
+          </button>
+          <template v-if="currentUser">
+            <button @click="loadProjectByName" class="btn btn-search">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              Загрузить проект
+            </button>
+          </template>
         </div>
 
         <div class="toolbar-divider"></div>
@@ -410,7 +427,7 @@
           </h3>
         </div>
         
-        <div class="save-template-section">
+        <div class="save-template-section" v-if="currentUser">
           <input type="text" v-model="templateName" placeholder="Название шаблона" class="input-modern" />
           <button @click="saveTemplate" class="btn-save btn-block">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -419,9 +436,15 @@
               <polyline points="7 3 7 8 15 8"/>
             </svg>
             Сохранить как шаблон
-          </button>
+            </button>
         </div>
-        
+
+        <div class="save-template-section" v-else>
+          <div class="login-hint">
+            <span>Войдите, чтобы сохранять шаблоны</span>
+          </div>
+        </div>      
+  
         <div class="templates-list">
           <div v-for="template in templates" :key="template.id" class="template-card">
             <div class="template-info">
@@ -608,14 +631,75 @@ export default {
       openLoginModal()
     }
     
-const loadTemplatesFromServer = async () => {
+const loadFallbackTemplates = () => {
+  const presetTemplates = [
+    {
+      id: 'preset1',
+      name: 'Рекламная листовка',
+      isPreset: true,
+      xml: `<?xml version="1.0" encoding="UTF-8"?>
+<flyer width="600" height="850" background="#f8f9fa" bgImage="" bgOpacity="100">
+  <element type="text" id="t1" x="100" y="100" width="400" height="80" 
+           content="СУПЕР АКЦИЯ!" font-family="Arial, sans-serif" font-size="48" 
+           font-weight="bold" font-style="normal" color="#dc3545" align="center"/>
+  <element type="text" id="t2" x="100" y="200" width="400" height="60" 
+           content="Скидки до 50%" font-family="Arial, sans-serif" font-size="32" 
+           font-weight="normal" font-style="italic" color="#495057" align="center"/>
+</flyer>`
+    },
+    {
+      id: 'preset2',
+      name: 'Приглашение',
+      isPreset: true,
+      xml: `<?xml version="1.0" encoding="UTF-8"?>
+<flyer width="600" height="850" background="#fff5f0" bgImage="" bgOpacity="100">
+  <element type="text" id="t1" x="100" y="80" width="400" height="60" 
+           content="ВЫ ПРИГЛАШЕНЫ" font-family="Georgia, serif" font-size="36" 
+           font-weight="bold" font-style="normal" color="#e67e22" align="center"/>
+  <element type="text" id="t2" x="100" y="160" width="400" height="200" 
+           content="На вечеринку по случаю Нового года\n22 декабря в 19:00" 
+           font-family="Georgia, serif" font-size="24" font-weight="normal" 
+           font-style="italic" color="#7f8c8d" align="center"/>
+</flyer>`
+    },
+    {
+      id: 'preset3',
+      name: 'Объявление',
+      isPreset: true,
+      xml: `<?xml version="1.0" encoding="UTF-8"?>
+<flyer width="600" height="850" background="#e8f4f8" bgImage="" bgOpacity="100">
+  <element type="text" id="t1" x="50" y="50" width="500" height="50" 
+           content="ОБЪЯВЛЕНИЕ" font-family="Arial, sans-serif" font-size="32" 
+           font-weight="bold" font-style="normal" color="#2980b9" align="center"/>
+  <element type="text" id="t2" x="50" y="120" width="500" height="400" 
+           content="Пропала собака\nПорода: такса\nОкрас: рыжий\nКличка: Барон\n\nТел.: 8-999-123-45-67" 
+           font-family="Arial, sans-serif" font-size="20" font-weight="normal" 
+           font-style="normal" color="#2c3e50" align="left"/>
+</flyer>`
+    }
+  ]
+  templates.value = presetTemplates
+  console.log('Fallback templates loaded:', templates.value.length)
+}
+
+const loadTemplatesFromServer = async (retryCount = 0) => {
+  const maxRetries = 3
+  
   try {
     isLoading.value = true
-    const response = await templatesAPI.getAll()
-    // Бэкенд возвращает массив шаблонов
-    const serverTemplates = response.data.items || response.data
+    const token = localStorage.getItem('access_token')
+    console.log(`Loading templates (attempt ${retryCount + 1}), token exists:`, !!token)
     
-    // Преобразуем в формат фронтенда
+    const response = await templatesAPI.getAll()
+    console.log('Templates API response status:', response.status)
+    
+    let serverTemplates = []
+    if (response.data.items) {
+      serverTemplates = response.data.items
+    } else if (Array.isArray(response.data)) {
+      serverTemplates = response.data
+    }
+    
     const formattedTemplates = serverTemplates.map(t => ({
       id: t.id,
       name: t.name,
@@ -623,30 +707,169 @@ const loadTemplatesFromServer = async () => {
       isPreset: t.user_id === null || t.user_id === undefined,
     }))
     
-    // Сохраняем предустановленные шаблоны (те, что были в localStorage)
-    // и добавляем серверные
     templates.value = formattedTemplates
+    console.log('Templates loaded successfully:', templates.value.length)
+    return true
   } catch (error) {
     console.error('Failed to load templates:', error)
-    // Если сервер недоступен, используем локальные пресеты
-    const savedTemplates = localStorage.getItem('flyer_templates')
-    const userTemplates = savedTemplates ? JSON.parse(savedTemplates) : []
-    const presetTemplates = getPresetTemplates() // вынесите пресеты в отдельную функцию
-    templates.value = [...presetTemplates, ...userTemplates]
+    
+    // Если есть токен, но сервер вернул 401, очищаем сессию
+    if (error.response && error.response.status === 401) {
+      console.log('Token invalid, clearing session')
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('flyer_username')
+      currentUser.value = null
+    }
+    
+    // Повторяем попытку, если не превышено максимальное количество
+    if (retryCount < maxRetries) {
+      console.log(`Retrying... (${retryCount + 1}/${maxRetries})`)
+      await new Promise(resolve => setTimeout(resolve, 500)) // Ждём 500ms
+      return loadTemplatesFromServer(retryCount + 1)
+    }
+    console.log('Using fallback templates')
+    loadFallbackTemplates()
+    return false
+  } finally {
+    isLoading.value = false
+  }
+}
+const saveProjectToServer = async () => {
+  if (!currentUser.value) {
+    alert('Необходимо войти в аккаунт для сохранения проекта')
+    return
+  }
+  
+  // Запрашиваем имя проекта
+  const projectName = prompt('Введите название проекта:', 'Мой проект')
+  if (!projectName || projectName.trim() === '') {
+    alert('Название проекта не может быть пустым')
+    return
+  }
+  
+  try {
+    isLoading.value = true
+    const xmlContent = generateCurrentXML()
+    
+    const response = await projectsAPI.create(projectName.trim(), xmlContent)
+    console.log('Project saved to server:', response.data)
+    
+    alert(`Проект "${projectName}" сохранён!`)
+  } catch (error) {
+    console.error('Failed to save project:', error)
+    if (error.response && error.response.status === 401) {
+      alert('Необходимо авторизоваться для сохранения проекта')
+    } else if (error.response && error.response.status === 400) {
+      alert('Ошибка: ' + (error.response.data?.detail || 'Некорректные данные'))
+    } else {
+      alert('Ошибка сохранения проекта')
+    }
   } finally {
     isLoading.value = false
   }
 }
 
-const saveProjectToServer = async () => {
+const loadProjectsList = async () => {
+  if (!currentUser.value) {
+    alert('Необходимо войти в аккаунт для загрузки проекта')
+    return
+  }
+  
   try {
     isLoading.value = true
-    const xmlContent = generateCurrentXML()
-    const response = await projectsAPI.create('Новый проект', xmlContent)
-    alert(`Проект сохранён! ID: ${response.data.id}`)
+    const response = await projectsAPI.getAll()
+    
+    if (!response.data || response.data.length === 0) {
+      alert('У вас нет сохранённых проектов')
+      return
+    }
+    
+    // Формируем список проектов
+    let message = 'Ваши проекты:\n\n'
+    response.data.forEach((p, index) => {
+      message += `${index + 1}. ${p.name}\n`
+    })
+    message += `\nВведите номер проекта для загрузки:`
+    
+    const choice = prompt(message)
+    if (!choice) return
+    
+    const selectedIndex = parseInt(choice) - 1
+    if (selectedIndex >= 0 && selectedIndex < response.data.length) {
+      await loadProjectById(response.data[selectedIndex].id)
+    } else {
+      alert('Неверный номер')
+    }
   } catch (error) {
-    console.error('Ошибка сохранения:', error)
-    alert('Ошибка сохранения проекта')
+    console.error('Failed to load projects:', error)
+    alert('Ошибка загрузки проектов')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const loadProjectById = async (projectId) => {
+  try {
+    isLoading.value = true
+    const response = await projectsAPI.getById(projectId)
+    const project = response.data
+    
+    await loadTemplate(project.xml_content)
+    alert(`Проект "${project.name}" загружен!`)
+  } catch (error) {
+    console.error('Failed to load project:', error)
+    alert('Ошибка загрузки проекта')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const loadProjectByName = async () => {
+  if (!currentUser.value) {
+    alert('Необходимо войти в аккаунт для загрузки проекта')
+    return
+  }
+  
+  const projectName = prompt('Введите название проекта для поиска:')
+  if (!projectName || projectName.trim() === '') {
+    return
+  }
+  
+  try {
+    isLoading.value = true
+    const response = await projectsAPI.getAll()
+    
+    // Ищем проект по названию (без учёта регистра)
+    const foundProjects = response.data.filter(p => 
+      p.name.toLowerCase().includes(projectName.toLowerCase())
+    )
+    
+    if (foundProjects.length === 0) {
+      alert(`Проект с названием "${projectName}" не найден`)
+      return
+    }
+    
+    if (foundProjects.length === 1) {
+      await loadProjectById(foundProjects[0].id)
+    } else {
+      // Если найдено несколько проектов, показываем список
+      let message = 'Найдено несколько проектов:\n\n'
+      foundProjects.forEach((p, index) => {
+        message += `${index + 1}. ${p.name} (${new Date(p.updated_at).toLocaleString()})\n`
+      })
+      message += `\nВведите номер проекта (1-${foundProjects.length}):`
+      
+      const choice = prompt(message)
+      if (!choice) return
+      
+      const selectedIndex = parseInt(choice) - 1
+      if (selectedIndex >= 0 && selectedIndex < foundProjects.length) {
+        await loadProjectById(foundProjects[selectedIndex].id)
+      }
+    }
+  } catch (error) {
+    console.error('Failed to search project:', error)
+    alert('Ошибка поиска проекта')
   } finally {
     isLoading.value = false
   }
@@ -730,6 +953,7 @@ const saveProjectToServer = async () => {
     const logout = () => {
   currentUser.value = null
   localStorage.removeItem('access_token')
+  localStorage.removeItem('flyer_username')
   // Не очищаем редактор, но обновляем шаблоны (показываем только пресеты)
   loadTemplatesFromServer()
 }
@@ -1377,6 +1601,11 @@ const generateCurrentXML = () => {
 }
 
     const saveTemplate = async () => {
+  if (!currentUser.value) {
+    alert('Необходимо войти в аккаунт для сохранения шаблона')
+    return
+  }
+  
   if (!templateName.value) {
     alert('Введите название шаблона')
     return
@@ -1386,18 +1615,24 @@ const generateCurrentXML = () => {
     isLoading.value = true
     const xmlContent = generateCurrentXML()
     
-    // Отправляем на сервер
     const response = await templatesAPI.create(templateName.value, xmlContent)
     console.log('Template saved to server:', response.data)
     
-    // Обновляем список шаблонов с сервера
     await loadTemplatesFromServer()
-    
     templateName.value = ''
     alert('Шаблон сохранён на сервере!')
   } catch (error) {
     console.error('Failed to save template:', error)
-    if (error.response && error.response.status === 401) {
+    
+    // Обработка ошибки дублирования имени
+    if (error.response && error.response.status === 400) {
+      const errorDetail = error.response.data?.detail || ''
+      if (errorDetail.includes('already exists')) {
+        alert(`Шаблон с именем "${templateName.value}" уже существует. Пожалуйста, выберите другое имя.`)
+      } else {
+        alert(`Ошибка: ${errorDetail}`)
+      }
+    } else if (error.response && error.response.status === 401) {
       alert('Необходимо авторизоваться для сохранения шаблона')
     } else {
       alert('Ошибка сохранения шаблона')
@@ -1544,20 +1779,48 @@ const generateCurrentXML = () => {
         .replace(/'/g, '&apos;')
     }
     
-   onMounted(() => {
-  // Загружаем шаблоны с сервера
-  loadTemplatesFromServer()
+const checkAuthAndLoad = async () => {
+  console.log('=== CHECKING AUTH STATUS ===')
   
-  // Проверяем сохранённую сессию
   const token = localStorage.getItem('access_token')
-  if (token) {
-    const savedUser = localStorage.getItem('flyer_username')
-    if (savedUser) {
-      currentUser.value = { username: savedUser }
-  }
+  console.log('Token in localStorage:', token ? 'exists' : 'not found')
+  
+  if (!token) {
+    console.log('No token, user is not authenticated')
+    currentUser.value = null
+    await loadTemplatesFromServer()
+    drawCanvas()
+    return
   }
   
+  // Пробуем получить информацию о пользователе по токену
+  try {
+    const response = await authAPI.getMe()
+    console.log('Auth check response:', response.data)
+    
+    if (response.data && response.data.username) {
+      currentUser.value = { username: response.data.username }
+      localStorage.setItem('flyer_username', response.data.username)
+      console.log('User authenticated:', response.data.username)
+    } else {
+      throw new Error('Invalid response')
+    }
+  } catch (error) {
+    console.error('Auth check failed:', error)
+    // Токен невалидный, очищаем
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('flyer_username')
+    currentUser.value = null
+  }
+  
+  // Загружаем шаблоны
+  await loadTemplatesFromServer()
   drawCanvas()
+}
+
+   onMounted(() => {
+  console.log('App mounted, checking auth...')
+  checkAuthAndLoad()
 })
     
     watch([canvasSize, backgroundColor, backgroundImage, bgOpacity, elements, selectedElementId, showGrid], () => {
@@ -1630,7 +1893,10 @@ const generateCurrentXML = () => {
       switchToLogin,
       login,
       register,
-      logout
+      logout,
+      saveProjectToServer,
+      loadProjectsList,
+      loadProjectByName
     }
   }
 }
